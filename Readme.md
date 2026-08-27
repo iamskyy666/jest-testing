@@ -1,3 +1,4 @@
+<img width="800" height="400" alt="image" src="https://github.com/user-attachments/assets/4b703e1c-af70-44e2-b971-c2cf88d60cca" />
 
 # 1. What Is Software Testing? 🧪
 
