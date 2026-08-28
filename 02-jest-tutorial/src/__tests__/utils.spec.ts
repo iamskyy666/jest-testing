@@ -13,7 +13,7 @@ describe("Utility Functions", () => {
     expect(add(1, 2)).toBe(3);
   });
 
-  it("should handle negative numbers", () => {
+  it("should handle add-negative numbers", () => {
     expect(add(-1, -2)).toBe(-3);
   });
 
@@ -22,11 +22,11 @@ describe("Utility Functions", () => {
     expect(subtract(5, 2)).toBe(3);
   });
 
-  it("should handle negative numbers", () => {
+  it("should handle subtract-negative numbers", () => {
     expect(subtract(-1, -2)).toBe(1);
   });
 
-  //! test inEven()
+  //! test isEven()
   it("returns true for even numbers", () => {
     expect(isEven(4)).toBe(true);
     expect(isEven(0)).toBe(true);
