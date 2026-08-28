@@ -1,0 +1,17 @@
+{
+  "name": "02-jest-tutorial",
+  "version": "1.0.0",
+  "description": "Jest Setup",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Soumadip Banerjee",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2"
+  }
+}
