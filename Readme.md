@@ -6603,7 +6603,714 @@ And the **single most important pipeline** to keep in our head is:
 ```
 ---
 
+# Naming Conventions
 
+Yes — this is mostly about **conventions and Jest's test-discovery rules**, not because `__tests__` or `.spec.ts` has some special TypeScript meaning.
 
+Let's separate the two.
 
+---
 
+## 1. Why do we use `__tests__`?
+
+Suppose our project is:
+
+```text
+src/
+├── sum.ts
+├── user.ts
+└── __tests__/
+    ├── sum.spec.ts
+    └── user.spec.ts
+```
+
+The name:
+
+```text
+__tests__
+```
+
+is a **conventional directory name** for tests.
+
+The double underscores don't have any special meaning to TypeScript.
+
+They're simply a convention that makes the folder immediately recognizable:
+
+```text
+__tests__/
+    ↓
+"These files contain tests."
+```
+
+So when we open a project and see:
+
+```text
+src/
+├── controllers/
+├── models/
+├── services/
+└── __tests__/
+```
+
+we immediately know where the tests are.
+
+---
+
+## 2. Is `__tests__` mandatory?
+
+**No.**
+
+We could call it:
+
+```text
+tests/
+```
+
+or:
+
+```text
+test/
+```
+
+or:
+
+```text
+spec/
+```
+
+or even:
+
+```text
+testing/
+```
+
+Jest doesn't inherently require:
+
+```text
+__tests__
+```
+
+Jest uses **test-discovery patterns** to determine which files are test files.
+
+So these can all be valid depending on our configuration:
+
+```text
+tests/sum.test.ts
+tests/sum.spec.ts
+src/__tests__/sum.test.ts
+src/__tests__/sum.spec.ts
+src/sum.test.ts
+```
+
+---
+
+## 3. Then why do we see `__tests__` so often?
+
+Because it's a well-established convention.
+
+Historically, Jest and other JavaScript testing ecosystems commonly use structures like:
+
+```text
+__tests__/
+```
+
+It provides a very obvious separation:
+
+```text
+src/
+├── sum.ts
+├── user.ts
+└── __tests__/
+    ├── sum.test.ts
+    └── user.test.ts
+```
+
+Instead of mixing implementation and test files:
+
+```text
+src/
+├── sum.ts
+├── sum.test.ts
+├── user.ts
+└── user.test.ts
+```
+
+Both approaches are perfectly reasonable.
+
+---
+
+## 4. What does `spec` mean?
+
+Now let's look at:
+
+```text
+sum.spec.ts
+```
+
+The important part is:
+
+```text
+.spec
+```
+
+`spec` is short for:
+
+> **specification**
+
+A test is essentially a specification of how our code should behave.
+
+For example:
+
+```ts
+it("should add two numbers correctly", () => {
+  expect(sum(1, 2)).toBe(3);
+});
+```
+
+We're specifying:
+
+```text
+Given 1 and 2
+        ↓
+sum()
+        ↓
+should produce 3
+```
+
+So:
+
+```text
+sum.spec.ts
+```
+
+can be read conceptually as:
+
+> "The specification/tests for `sum`."
+
+---
+
+# 5. Why `.test.ts`?
+
+We can instead use:
+
+```text
+sum.test.ts
+```
+
+Here:
+
+```text
+.test
+```
+
+literally communicates:
+
+> "This is a test."
+
+And:
+
+```text
+.ts
+```
+
+means:
+
+> "This is a TypeScript file."
+
+So:
+
+```text
+sum.test.ts
+│   │    │
+│   │    └── TypeScript
+│   └─────── test file
+└─────────── related to sum
+```
+
+Similarly:
+
+```text
+sum.spec.ts
+│   │    │
+│   │    └── TypeScript
+│   └─────── specification
+└─────────── related to sum
+```
+
+---
+
+# 6. `.spec.ts` and `.test.ts` are both conventions
+
+We could have:
+
+```text
+sum.test.ts
+```
+
+or:
+
+```text
+sum.spec.ts
+```
+
+and both are commonly used with Jest.
+
+For example:
+
+```text
+calculator.test.ts
+calculator.spec.ts
+
+user.test.ts
+user.spec.ts
+
+auth.test.ts
+auth.spec.ts
+```
+
+The difference is primarily **naming style**, not testing capability.
+
+---
+
+## 7. Why does Jest know about them?
+
+This is where our previous discussion about **test discovery** becomes important.
+
+Jest has patterns for finding test files.
+
+Conceptually, it can look for things matching:
+
+```text
+*.test.ts
+```
+
+and:
+
+```text
+*.spec.ts
+```
+
+So:
+
+```text
+sum.spec.ts
+```
+
+matches the test-file pattern.
+
+And:
+
+```text
+sum.test.ts
+```
+
+also matches.
+
+That's why Jest can automatically find them when we run:
+
+```bash
+npm test
+```
+
+---
+
+## 8. What about the `__tests__` folder?
+
+Jest also has conventions around directories named:
+
+```text
+__tests__
+```
+
+So we might have:
+
+```text
+src/
+└── __tests__/
+    └── sum.spec.ts
+```
+
+Jest can recognize this structure as a test location.
+
+Again, though:
+
+> **It's the Jest configuration/discovery rules that matter, not the folder name itself.**
+
+---
+
+## 9. We can prove this ourselves
+
+Our current structure is:
+
+```text
+src/
+├── sum.ts
+└── __tests__/
+    └── sum.spec.ts
+```
+
+Suppose we rename:
+
+```text
+__tests__
+```
+
+to:
+
+```text
+tests
+```
+
+giving:
+
+```text
+src/
+├── sum.ts
+└── tests/
+    └── sum.spec.ts
+```
+
+Jest can still find the test because:
+
+```text
+sum.spec.ts
+```
+
+matches the test-file naming convention.
+
+The directory doesn't necessarily need to be called `__tests__`.
+
+---
+
+## 10. We can even put the test next to the source
+
+For example:
+
+```text
+src/
+├── sum.ts
+└── sum.spec.ts
+```
+
+This is called **co-locating tests**.
+
+It has a nice advantage:
+
+```text
+sum.ts
+sum.spec.ts
+```
+
+are right beside each other.
+
+When we're working on `sum`, the corresponding tests are immediately visible.
+
+---
+
+## 11. Two common project structures
+
+### Style 1 — Separate test directory
+
+```text
+src/
+├── sum.ts
+├── user.ts
+└── __tests__/
+    ├── sum.spec.ts
+    └── user.spec.ts
+```
+
+This gives us a clean separation:
+
+```text
+production code
+      vs
+test code
+```
+
+---
+
+### Style 2 — Co-located tests
+
+```text
+src/
+├── sum.ts
+├── sum.spec.ts
+├── user.ts
+└── user.spec.ts
+```
+
+This keeps each test next to the code it tests.
+
+Neither is universally "correct."
+
+---
+
+## 12. Why do developers care about the naming convention?
+
+Because conventions make projects predictable.
+
+Imagine we join a company and see:
+
+```text
+src/
+├── auth/
+│   ├── auth.service.ts
+│   ├── auth.service.spec.ts
+│   ├── auth.controller.ts
+│   └── auth.controller.spec.ts
+│
+├── users/
+│   ├── user.service.ts
+│   ├── user.service.spec.ts
+│   └── user.controller.ts
+```
+
+We immediately understand:
+
+```text
+*.ts
+     ↓
+Implementation
+
+*.spec.ts
+     ↓
+Tests
+```
+
+We don't have to open every file to figure it out.
+
+That's the real value of conventions.
+
+---
+
+## 13. `__tests__` doesn't mean "private" or "special TypeScript"
+
+This is worth emphasizing because the name can look unusual:
+
+```text
+__tests__
+```
+
+The `__` does **not** mean:
+
+```text
+private
+internal
+special TypeScript folder
+```
+
+It's simply a conventional directory name used by testing ecosystems.
+
+Likewise:
+
+```text
+__mocks__
+```
+
+is another convention we'll eventually encounter in Jest.
+
+---
+
+## 14. What actually matters to Jest?
+
+Think of it like this:
+
+```text
+                 Jest
+                   │
+                   ↓
+          Test discovery rules
+                   │
+          ┌────────┴────────┐
+          ↓                 ↓
+    Filename pattern    Directory pattern
+          │                 │
+          ↓                 ↓
+    *.test.ts           __tests__
+    *.spec.ts
+```
+
+Our file:
+
+```text
+src/__tests__/sum.spec.ts
+```
+
+fits both conventions nicely.
+
+That's why it's such a common structure.
+
+---
+
+## 15. Why `sum.spec.ts` rather than just `sum.ts`?
+
+Because we don't want Jest to confuse **production code** with **test code**.
+
+Consider:
+
+```text
+sum.ts
+```
+
+This contains our application functionality:
+
+```ts
+export const sum = (a: number, b: number): number => a + b;
+```
+
+Whereas:
+
+```text
+sum.spec.ts
+```
+
+contains the specification of how that functionality should behave:
+
+```ts
+describe("sum function", () => {
+  it("should add two numbers correctly", () => {
+    expect(sum(1, 2)).toBe(3);
+  });
+});
+```
+
+So:
+
+```text
+sum.ts
+   ↓
+"What does our program DO?"
+
+sum.spec.ts
+   ↓
+"How do we EXPECT it to behave?"
+```
+
+That's a very useful mental model.
+
+---
+
+## 16. One subtle point: `describe()` has nothing to do with `.spec`
+
+Don't mix these up.
+
+We have:
+
+```ts
+describe("sum function", () => {
+```
+
+and:
+
+```text
+sum.spec.ts
+```
+
+They happen to use similar terminology, but they're separate concepts.
+
+### `describe()`
+
+Jest API:
+
+```ts
+describe(...)
+```
+
+Used to group related tests.
+
+### `.spec`
+
+Filename convention:
+
+```text
+sum.spec.ts
+```
+
+Used to identify a test/specification file.
+
+So:
+
+```text
+describe()
+   ↓
+Jest API
+
+.spec.ts
+   ↓
+File naming convention
+```
+
+---
+
+## 17. What I'd recommend for our learning project
+
+For our current Jest + TypeScript sandbox, I'd keep:
+
+```text
+src/
+├── sum.ts
+└── __tests__/
+    └── sum.spec.ts
+```
+
+It's a very recognizable structure and will make Jest's discovery concepts easy to see.
+
+Later, when we work with larger Node/Express applications, we'll encounter other structures such as:
+
+```text
+src/
+├── controllers/
+├── services/
+├── models/
+├── routes/
+└── __tests__/
+```
+
+or:
+
+```text
+src/
+├── services/
+│   ├── user.service.ts
+│   └── user.service.spec.ts
+```
+
+Both are common in professional codebases.
+
+---
+
+## The short version
+
+```text
+__tests__/
+    ↓
+Conventional folder for test files
+
+.spec.ts
+    ↓
+Conventional suffix meaning "specification/test"
+
+.test.ts
+    ↓
+Conventional suffix meaning "test"
+
+.ts
+    ↓
+TypeScript file
+```
+
+So:
+
+```text
+src/__tests__/sum.spec.ts
+```
+
+essentially tells both **humans and Jest**:
+
+> "This is the TypeScript test/specification file for `sum`."
+
+And importantly, **none of these names are inherently required**. Jest's `testMatch`/discovery configuration ultimately determines what gets treated as a test.
+
+That distinction—**convention vs actual framework behavior**—is worth keeping in mind throughout our Jest learning.
+----
