@@ -1315,3 +1315,1673 @@ Controller
 ```
 
 We'll use spies/mocks to isolate those dependencies and test the controller's behavior without actually hitting the database, generating real JWTs, or sending real emails.
+
+```ts
+// CODE
+const user = {
+  saveProfile: (name: string) => {
+    return `saved-${name}`;
+  },
+
+  getRole: (userId: number) => {
+    if (userId > 10) {
+      return "guest";
+    }
+    return "admin";
+  },
+
+  fetchUserData: async (userId: number) => {
+    // imagine this calls an API
+    return { id: userId, name: "John" };
+  },
+};
+
+// ------------------------------------- 🧪
+
+//! Spy using jest.spyOn()
+describe("spy mocking examples", () => {
+  it("uses mockReturnValue for sync functions", () => {
+    jest.spyOn(user, "getRole").mockReturnValue("guest");
+    const result = user.getRole(9);
+    // expect(result).toBe("admin"); ❌ FAILS!
+    expect(result).toBe("guest");
+  });
+
+  // mock/spy async f(x) - jest.mockResolvedValue()
+  it("uses mockResolvedValue for async functions ", async () => {
+    const dummyUser = { id: 69, name: "Mocked User - Skyy" };
+    jest.spyOn(user, "fetchUserData").mockResolvedValue(dummyUser); // overriding
+
+    const result = await user.fetchUserData(34);
+    expect(result).toStrictEqual(dummyUser);
+  });
+
+  // complex logic - jest.mockImplementation()
+  // modify the behaviour - most powerful
+  it("uses mockImplementation for complex logic", () => {
+    jest.spyOn(user, "saveProfile").mockImplementation((name: string) => {
+      if (!name) {
+        throw new Error(`🔴Name is required!`);
+      }
+      return `saved-${name}`;
+    });
+    expect(() => user.saveProfile("")).toThrow("🔴Name is required!");
+  });
+});
+
+
+//! ---------------------------------------------------------
+/*
+$ npm test -- example
+
+> 03-test-doubles@1.0.0 test
+> jest example
+
+ PASS  src/example.spec.ts
+  spy mocking examples
+    √ uses mockReturnValue for sync functions (3 ms)
+    √ uses mockResolvedValue for async functions  (2 ms)
+    √ uses mockImplementation for complex logic (24 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       3 passed, 3 total
+Snapshots:   0 total
+Time:        0.732 s, estimated 1 s
+Ran all test suites matching example.
+*/
+//! ---------------------------------------------------------
+
+```
+---
+
+**`clearAllMocks()`, `resetAllMocks()`, and `restoreAllMocks()` look almost identical but solve three different problems**.
+
+The key is to understand **what exactly Jest remembers about a mock** and then what each API removes.
+
+---
+
+# 1. First: What does a Jest mock actually contain?
+
+When we create:
+
+```ts
+const mockFn = jest.fn();
+```
+
+Jest doesn't just create an ordinary function.
+
+It creates a function that can **record information about its usage**.
+
+For example:
+
+```ts
+mockFn(10);
+mockFn(20);
+```
+
+Jest can now know:
+
+```text
+How many times was it called?
+        ↓
+2
+
+What arguments were used?
+        ↓
+[10]
+[20]
+
+What did it return?
+        ↓
+...
+```
+
+And we can inspect that with matchers:
+
+```ts
+expect(mockFn).toHaveBeenCalledTimes(2);
+
+expect(mockFn).toHaveBeenCalledWith(10);
+expect(mockFn).toHaveBeenCalledWith(20);
+```
+
+But mocks can also have **configured behavior**:
+
+```ts
+mockFn.mockReturnValue(100);
+```
+
+Now:
+
+```ts
+mockFn(); // 100
+```
+
+So there are two important categories of mock state:
+
+```text
+                 Jest Mock
+                    │
+          ┌─────────┴─────────┐
+          ↓                   ↓
+     Call information      Implementation
+          │                   │
+     calls, args, etc.    return values,
+                          implementations
+```
+
+And there's a third concept when using `jest.spyOn()`:
+
+```text
+Original implementation
+          ↓
+      spy/mock
+          ↓
+Temporary replacement
+```
+
+This is what gives us the three different operations.
+
+---
+
+# 2. The three APIs
+
+The three APIs we need to distinguish are:
+
+```ts
+jest.clearAllMocks();
+
+jest.resetAllMocks();
+
+jest.restoreAllMocks();
+```
+
+Think:
+
+```text
+CLEAR
+  ↓
+Forget calls
+
+RESET
+  ↓
+Forget calls + behavior
+
+RESTORE
+  ↓
+Put original implementations back
+```
+
+That's the core.
+
+---
+
+# 3. `jest.clearAllMocks()`
+
+`clearAllMocks()` removes the **recorded call information** from mocks.
+
+It does **not** remove the mock's implementation.
+
+For example:
+
+```ts
+const mockFn = jest.fn();
+
+mockFn.mockReturnValue(42);
+
+mockFn("hello");
+
+console.log(mockFn.mock.calls.length);
+// 1
+```
+
+Then:
+
+```ts
+jest.clearAllMocks();
+```
+
+Now:
+
+```ts
+mockFn.mock.calls.length
+```
+
+is:
+
+```text
+0
+```
+
+But the implementation is still there.
+
+Therefore:
+
+```ts
+mockFn();
+```
+
+still returns:
+
+```text
+42
+```
+
+That's the crucial behavior.
+
+---
+
+# 4. Visualizing `clearAllMocks()`
+
+Before:
+
+```text
+mockFn
+│
+├── calls
+│    └── ["hello"]
+│
+├── call count
+│    └── 1
+│
+└── implementation
+     └── return 42
+```
+
+After:
+
+```ts
+jest.clearAllMocks();
+```
+
+we get:
+
+```text
+mockFn
+│
+├── calls
+│    └── []
+│
+├── call count
+│    └── 0
+│
+└── implementation
+     └── return 42  ← STILL THERE
+```
+
+So:
+
+> **Clear = erase usage history, keep behavior.**
+
+---
+
+# 5. Why would we want this?
+
+Suppose we have:
+
+```ts
+const logger = {
+  log: jest.fn(),
+};
+```
+
+And multiple tests use it.
+
+Test 1:
+
+```ts
+logger.log("hello");
+
+expect(logger.log)
+  .toHaveBeenCalledTimes(1);
+```
+
+After Test 1, Jest remembers:
+
+```text
+calls = 1
+```
+
+If Test 2 uses the same mock without clearing:
+
+```ts
+logger.log("world");
+
+expect(logger.log)
+  .toHaveBeenCalledTimes(1);
+```
+
+we could get:
+
+```text
+Expected: 1
+Received: 2
+```
+
+because the call from Test 1 is still recorded.
+
+That's **test pollution**.
+
+---
+
+# 6. `clearAllMocks()` solves call-history pollution
+
+We can put:
+
+```ts
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+```
+
+Then:
+
+```text
+Test #1
+  ↓
+mock called
+  ↓
+calls = 1
+
+clearAllMocks()
+  ↓
+calls = 0
+
+Test #2
+  ↓
+mock called
+  ↓
+calls = 1
+```
+
+The mock behavior remains intact.
+
+---
+
+# 7. `clearAllMocks()` is essentially about `.mock`
+
+Jest mock functions expose information through:
+
+```ts
+mockFn.mock
+```
+
+For example:
+
+```ts
+mockFn.mock.calls
+mockFn.mock.results
+mockFn.mock.instances
+```
+
+When we clear:
+
+```ts
+jest.clearAllMocks();
+```
+
+Jest clears this recorded information.
+
+Conceptually:
+
+```text
+mock.calls       → []
+mock.results     → []
+mock.instances   → []
+```
+
+But the configured implementation remains.
+
+---
+
+# 8. `resetAllMocks()`
+
+Now things become stronger.
+
+```ts
+jest.resetAllMocks();
+```
+
+does what `clearAllMocks()` does **plus resets mock implementations**.
+
+Think:
+
+```text
+clearAllMocks()
+    ↓
+clear history
+
+resetAllMocks()
+    ↓
+clear history
++
+reset behavior
+```
+
+---
+
+# 9. Example
+
+Suppose:
+
+```ts
+const mockFn = jest.fn();
+
+mockFn.mockReturnValue(42);
+
+console.log(mockFn());
+// 42
+```
+
+Then:
+
+```ts
+jest.resetAllMocks();
+```
+
+The mock is reset to its default mock behavior.
+
+So:
+
+```ts
+console.log(mockFn());
+```
+
+will no longer return:
+
+```text
+42
+```
+
+Instead, an ordinary Jest mock function returns:
+
+```text
+undefined
+```
+
+So conceptually:
+
+```text
+Before reset:
+
+mockFn
+ ├── calls → [...]
+ └── implementation → return 42
+
+
+After reset:
+
+mockFn
+ ├── calls → []
+ └── implementation → default mock
+```
+
+---
+
+# 10. `resetAllMocks()` is useful when behavior changes between tests
+
+Suppose:
+
+```ts
+const getUser = jest.fn();
+```
+
+Test 1:
+
+```ts
+getUser.mockReturnValue({
+  name: "Alice",
+});
+```
+
+Test 2:
+
+```ts
+getUser.mockReturnValue({
+  name: "Bob",
+});
+```
+
+If we're carefully configuring the mock every time, we're fine.
+
+But if we accidentally rely on the previous implementation, tests can become coupled.
+
+Using:
+
+```ts
+beforeEach(() => {
+  jest.resetAllMocks();
+});
+```
+
+ensures:
+
+```text
+Test starts
+    ↓
+No previous calls
+    ↓
+No previous implementation
+    ↓
+Fresh mock configuration
+```
+
+---
+
+# 11. `clear` vs `reset`
+
+This is probably the most important comparison.
+
+### `clearAllMocks()`
+
+```text
+"What happened?"
+        ↓
+Forget it.
+```
+
+### `resetAllMocks()`
+
+```text
+"What happened?"
+        ↓
+Forget it.
+
+"What behavior did we configure?"
+        ↓
+Forget that too.
+```
+
+So:
+
+```text
+CLEAR
+├── calls ❌
+├── results ❌
+├── instances ❌
+└── implementation ✅
+
+RESET
+├── calls ❌
+├── results ❌
+├── instances ❌
+└── implementation ❌
+```
+
+---
+
+# 12. Now the third one: `restoreAllMocks()`
+
+This one is different.
+
+```ts
+jest.restoreAllMocks();
+```
+
+is primarily about **restoring original implementations**, especially for spies created using:
+
+```ts
+jest.spyOn()
+```
+
+Suppose we have:
+
+```ts
+const calculator = {
+  add(a: number, b: number) {
+    return a + b;
+  },
+};
+```
+
+We create a spy:
+
+```ts
+const spy = jest.spyOn(calculator, "add");
+```
+
+Initially:
+
+```text
+calculator.add
+      ↓
+original implementation
+```
+
+The spy wraps it so Jest can observe it.
+
+---
+
+# 13. Temporarily replacing the implementation
+
+We can even change its behavior:
+
+```ts
+spy.mockReturnValue(100);
+```
+
+Now:
+
+```ts
+calculator.add(2, 3);
+```
+
+returns:
+
+```text
+100
+```
+
+instead of:
+
+```text
+5
+```
+
+The original implementation has been replaced temporarily.
+
+---
+
+# 14. `restoreAllMocks()` puts it back
+
+Now:
+
+```ts
+jest.restoreAllMocks();
+```
+
+The original implementation is restored.
+
+So:
+
+```text
+Before spy
+
+calculator.add()
+      ↓
+2 + 3
+      ↓
+5
+```
+
+Then:
+
+```text
+jest.spyOn()
+      ↓
+calculator.add()
+      ↓
+mock/spied implementation
+      ↓
+100
+```
+
+Then:
+
+```text
+restoreAllMocks()
+      ↓
+calculator.add()
+      ↓
+original implementation
+      ↓
+5
+```
+
+That's what **restore** means.
+
+---
+
+# 15. The critical distinction
+
+Here's where we need to be careful.
+
+Suppose we have:
+
+```ts
+const spy = jest.spyOn(calculator, "add");
+
+spy.mockReturnValue(100);
+```
+
+Now:
+
+```ts
+jest.clearAllMocks();
+```
+
+does **not** restore `calculator.add()`.
+
+It merely clears its call history.
+
+The mock implementation remains.
+
+Likewise:
+
+```ts
+jest.resetAllMocks();
+```
+
+resets the mock behavior, but it does not mean:
+
+> "Put the original `calculator.add()` back."
+
+For that, we use:
+
+```ts
+jest.restoreAllMocks();
+```
+
+---
+
+# 16. The three operations visually
+
+This is the mental model I'd memorize:
+
+```text
+                 MOCK
+                  │
+       ┌──────────┼──────────┐
+       ↓          ↓          ↓
+    History    Behavior    Original
+       │          │        implementation
+       ↓          ↓          │
+     CLEAR      RESET        RESTORE
+       │          │          │
+       ↓          ↓          ↓
+    forget     forget      put original
+     calls     behavior      back
+```
+
+Or:
+
+```text
+CLEAR   → "Forget what happened."
+
+RESET   → "Start the mock from scratch."
+
+RESTORE → "Stop mocking and return to reality."
+```
+
+That last phrase is a particularly good mental shortcut.
+
+---
+
+# 17. Let's use our Calculator example
+
+We can connect this directly to the Calculator we've been working with.
+
+Suppose:
+
+```ts
+class Calculator {
+  add(a: number, b: number) {
+    return a + b;
+  }
+}
+```
+
+Our test:
+
+```ts
+describe("Calculator", () => {
+  let calc: Calculator;
+
+  beforeEach(() => {
+    calc = new Calculator();
+  });
+
+  it("tracks calls", () => {
+    const spy = jest.spyOn(calc, "add");
+
+    calc.add(2, 3);
+
+    expect(spy).toHaveBeenCalledWith(2, 3);
+  });
+});
+```
+
+Because `jest.spyOn()` by default **still calls the original implementation**, the result remains:
+
+```ts
+calc.add(2, 3); // 5
+```
+
+while Jest records the call.
+
+---
+
+# 18. Now let's change the implementation
+
+```ts
+const spy = jest.spyOn(calc, "add");
+
+spy.mockReturnValue(999);
+```
+
+Now:
+
+```ts
+calc.add(2, 3);
+```
+
+returns:
+
+```text
+999
+```
+
+instead of:
+
+```text
+5
+```
+
+That's useful when we're testing another component that depends on `calc.add()`.
+
+---
+
+# 19. What happens with `clearAllMocks()`?
+
+After:
+
+```ts
+calc.add(2, 3);
+
+jest.clearAllMocks();
+```
+
+we have:
+
+```text
+call history → cleared
+implementation → still mocked
+```
+
+So:
+
+```ts
+calc.add(2, 3);
+```
+
+still returns:
+
+```text
+999
+```
+
+---
+
+# 20. What happens with `resetAllMocks()`?
+
+After:
+
+```ts
+jest.resetAllMocks();
+```
+
+we have:
+
+```text
+call history → cleared
+implementation → reset
+```
+
+The mock no longer has our `mockReturnValue(999)` configuration.
+
+But here's the subtle part:
+
+> `resetAllMocks()` does **not necessarily restore the original object method**.
+
+The method can remain a Jest mock, just with its implementation reset.
+
+That's why `restoreAllMocks()` exists.
+
+---
+
+# 21. What happens with `restoreAllMocks()`?
+
+After:
+
+```ts
+jest.restoreAllMocks();
+```
+
+the spy is removed and the original method is put back.
+
+So:
+
+```ts
+calc.add(2, 3);
+```
+
+again executes:
+
+```ts
+return a + b;
+```
+
+and gives:
+
+```text
+5
+```
+
+---
+
+# 22. A very important table
+
+| API                 | Clear calls? | Reset implementation? | Restore original? |
+| ------------------- | -----------: | --------------------: | ----------------: |
+| `clearAllMocks()`   |            ✅ |                     ❌ |                 ❌ |
+| `resetAllMocks()`   |            ✅ |                     ✅ |                 ❌ |
+| `restoreAllMocks()` |           ✅* |                    ❌* |                 ✅ |
+
+`restoreAllMocks()` is specifically about mocks/spies that can be restored to an original implementation, especially `jest.spyOn()`.
+
+The safest mental model is:
+
+```text
+clear → history
+reset → mock state
+restore → original code
+```
+
+---
+
+# 23. Individual versions
+
+We don't always have to affect every mock.
+
+There are individual equivalents.
+
+### Clear one mock
+
+```ts
+mockFn.mockClear();
+```
+
+### Reset one mock
+
+```ts
+mockFn.mockReset();
+```
+
+### Restore one spy
+
+```ts
+spy.mockRestore();
+```
+
+So:
+
+```text
+All mocks:
+jest.clearAllMocks()
+jest.resetAllMocks()
+jest.restoreAllMocks()
+
+One mock:
+mockFn.mockClear()
+mockFn.mockReset()
+spy.mockRestore()
+```
+
+---
+
+# 24. Why `mockRestore()` is different
+
+This is especially important with:
+
+```ts
+jest.spyOn()
+```
+
+Example:
+
+```ts
+const spy = jest.spyOn(console, "log");
+```
+
+We have modified/wrapped:
+
+```ts
+console.log
+```
+
+When the test finishes, we don't want the rest of our tests accidentally using the modified version.
+
+So:
+
+```ts
+spy.mockRestore();
+```
+
+puts `console.log` back.
+
+Or globally:
+
+```ts
+jest.restoreAllMocks();
+```
+
+---
+
+# 25. A common testing pattern
+
+A very common pattern is:
+
+```ts
+describe("Something", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // tests...
+});
+```
+
+This says:
+
+> "Every test gets clean mock call history."
+
+This is especially useful when the same mock is shared.
+
+---
+
+# 26. Another pattern: `resetAllMocks()`
+
+We might use:
+
+```ts
+beforeEach(() => {
+  jest.resetAllMocks();
+});
+```
+
+when we want:
+
+> "Every test starts with mocks having no previous configuration."
+
+For example, if each test configures:
+
+```ts
+mockFn.mockReturnValue(...)
+```
+
+independently.
+
+---
+
+# 27. Another pattern: `restoreAllMocks()`
+
+For spies:
+
+```ts
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+```
+
+This is very useful.
+
+For example:
+
+```ts
+it("spies on Date.now", () => {
+  jest.spyOn(Date, "now")
+    .mockReturnValue(123456);
+
+  expect(Date.now()).toBe(123456);
+});
+```
+
+After the test:
+
+```ts
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+```
+
+Now other tests get the real `Date.now()` again.
+
+---
+
+# 28. Why `afterEach()` is often a good place for restore
+
+Think about this:
+
+```text
+Test #1
+   ↓
+spy created
+   ↓
+method replaced
+   ↓
+test finishes
+   ↓
+restoreAllMocks()
+   ↓
+original method
+
+Test #2
+   ↓
+starts clean
+```
+
+Without restoration:
+
+```text
+Test #1
+   ↓
+spy created
+   ↓
+method replaced
+   ↓
+test finishes
+
+Test #2
+   ↓
+accidentally inherits modified method
+```
+
+That creates **test pollution**.
+
+---
+
+# 29. `clear` does NOT mean "fresh mock"
+
+This is a common beginner mistake.
+
+Suppose:
+
+```ts
+const mockFn = jest.fn()
+  .mockReturnValue(50);
+```
+
+Then:
+
+```ts
+jest.clearAllMocks();
+```
+
+Some people expect:
+
+```ts
+mockFn() // undefined
+```
+
+But that's wrong.
+
+We only cleared its history.
+
+```ts
+mockFn(); // 50
+```
+
+The behavior remains.
+
+---
+
+# 30. `reset` does NOT necessarily mean "original function"
+
+Another common mistake.
+
+Suppose:
+
+```ts
+const spy = jest.spyOn(obj, "method");
+
+spy.mockReturnValue(50);
+```
+
+Then:
+
+```ts
+jest.resetAllMocks();
+```
+
+doesn't mean:
+
+```text
+original method restored
+```
+
+Instead, it means:
+
+```text
+mock is reset
+```
+
+If we specifically want the real method back:
+
+```ts
+jest.restoreAllMocks();
+```
+
+---
+
+# 31. A useful hierarchy
+
+Think of the operations as increasingly destructive to mock configuration:
+
+```text
+CLEAR
+  │
+  └── removes call history
+
+
+RESET
+  │
+  ├── removes call history
+  └── removes mock configuration
+
+
+RESTORE
+  │
+  └── removes the mock/spy replacement
+      and restores original implementation
+```
+
+Although "restore" isn't simply "more reset"; it serves a different purpose.
+
+---
+
+# 32. Configuration options in `jest.config.ts`
+
+We can also configure Jest globally.
+
+For example:
+
+```ts
+const config: Config.InitialOptions = {
+  preset: "ts-jest",
+  testEnvironment: "node",
+
+  clearMocks: true,
+};
+```
+
+This is equivalent to having Jest automatically clear mock call history between tests.
+
+---
+
+We can also configure:
+
+```ts
+resetMocks: true,
+```
+
+and:
+
+```ts
+restoreMocks: true,
+```
+
+So conceptually:
+
+```ts
+const config = {
+  clearMocks: true,
+  resetMocks: true,
+  restoreMocks: true,
+};
+```
+
+These correspond to the three concepts we've just learned.
+
+---
+
+# 33. Should we enable all three?
+
+We shouldn't blindly add everything.
+
+For learning, it's better to understand what each one does.
+
+In real projects, the choice depends on the project's testing style.
+
+For example, if we're primarily concerned about call-history pollution:
+
+```ts
+clearMocks: true
+```
+
+may be sufficient.
+
+If we want every mock to be reset between tests:
+
+```ts
+resetMocks: true
+```
+
+may be appropriate.
+
+If we're heavily using spies:
+
+```ts
+restoreMocks: true
+```
+
+can be particularly useful.
+
+---
+
+# 34. `clearMocks` vs `resetMocks` vs `restoreMocks`
+
+The config names map directly:
+
+```text
+jest.config.ts
+
+clearMocks: true
+       ↓
+jest.clearAllMocks()
+
+resetMocks: true
+       ↓
+jest.resetAllMocks()
+
+restoreMocks: true
+       ↓
+jest.restoreAllMocks()
+```
+
+This makes the config much easier to understand.
+
+---
+
+# 35. A practical example
+
+Suppose:
+
+```ts
+const api = {
+  getUser: () => "real user",
+};
+```
+
+Test:
+
+```ts
+describe("API", () => {
+  it("test 1", () => {
+    const spy = jest.spyOn(api, "getUser");
+
+    spy.mockReturnValue("Alice");
+
+    expect(api.getUser()).toBe("Alice");
+  });
+
+  it("test 2", () => {
+    expect(api.getUser()).toBe("real user");
+  });
+});
+```
+
+If we don't restore the spy properly, Test 2 can potentially inherit the altered behavior.
+
+That's why we might do:
+
+```ts
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+```
+
+Now:
+
+```text
+Test 1
+ ↓
+spy
+ ↓
+return Alice
+ ↓
+restore
+
+Test 2
+ ↓
+real implementation
+ ↓
+return "real user"
+```
+
+Clean.
+
+---
+
+# 36. Our Calculator + hooks
+
+Let's put everything we've learned together.
+
+```ts
+describe("Calculator", () => {
+  let calc: Calculator;
+
+  beforeEach(() => {
+    calc = new Calculator();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("should spy on add", () => {
+    const spy = jest.spyOn(calc, "add");
+
+    calc.add(2);
+
+    expect(spy).toHaveBeenCalledWith(2);
+  });
+
+  it("should use mocked implementation", () => {
+    const spy = jest.spyOn(calc, "add");
+
+    spy.mockReturnValue(100);
+
+    expect(calc.add(2)).toBe(100);
+  });
+});
+```
+
+Our lifecycle becomes:
+
+```text
+beforeEach()
+    ↓
+new Calculator()
+    ↓
+TEST
+    ↓
+spy/mock
+    ↓
+assertions
+    ↓
+afterEach()
+    ↓
+restoreAllMocks()
+```
+
+That's a very solid testing structure.
+
+---
+
+# 37. One more important distinction: `clear` vs `reset` vs `restore`
+
+Let's imagine our mock has three layers:
+
+```text
+             Jest Mock
+                 │
+        ┌────────┼────────┐
+        ↓        ↓        ↓
+      History  Behavior  Original
+```
+
+### `clearAllMocks()`
+
+```text
+History  → DELETE
+Behavior → KEEP
+Original → irrelevant
+```
+
+### `resetAllMocks()`
+
+```text
+History  → DELETE
+Behavior → RESET
+Original → not restored
+```
+
+### `restoreAllMocks()`
+
+```text
+History/Mock → spy removed
+Behavior     → original
+Original     → RESTORED
+```
+
+---
+
+# 38. The cheat sheet
+
+We can keep this in our Jest notes:
+
+```text
+┌──────────────────────┬───────────────────────────────┐
+│ API                  │ Meaning                       │
+├──────────────────────┼───────────────────────────────┤
+│ clearAllMocks()      │ Clear call history            │
+│ resetAllMocks()      │ Clear history + mock behavior │
+│ restoreAllMocks()    │ Restore original implementation│
+└──────────────────────┴───────────────────────────────┘
+```
+
+And the individual versions:
+
+```ts
+mockFn.mockClear();     // clear history
+mockFn.mockReset();     // reset mock
+spy.mockRestore();      // restore original
+```
+
+---
+
+# 39. The three sentences to memorize
+
+If we remember nothing else, remember these:
+
+### 🧹 Clear
+
+> **"Forget what the mock did."**
+
+```ts
+jest.clearAllMocks();
+```
+
+### 🔄 Reset
+
+> **"Forget what the mock did and how we configured it."**
+
+```ts
+jest.resetAllMocks();
+```
+
+### ↩️ Restore
+
+> **"Stop replacing the real implementation; put the original back."**
+
+```ts
+jest.restoreAllMocks();
+```
+
+And the practical rule:
+
+```text
+jest.fn()
+   ↓
+clear/reset are common
+
+jest.spyOn()
+   ↓
+restore is especially important
+```
+
+Once we start mocking **database repositories, Express dependencies, external APIs, `fs`, timers, modules, and other Node.js functionality**, this distinction will become extremely important.
+
+--- 
+
+```ts
+// CODE
+const user = {
+  saveProfile: (name: string) => {
+    return `saved-${name}`;
+  },
+
+  getRole: (userId: number) => {
+    if (userId > 10) {
+      return "guest";
+    }
+    return "admin";
+  },
+
+  fetchUserData: async (userId: number) => {
+    // imagine this calls an API
+    return { id: userId, name: "John" };
+  },
+};
+
+// ------------------------------------- 🧪
+
+//! Clearing and resetting mocks in JEST
+describe("user role test", () => {
+  let roleSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    roleSpy = jest.spyOn(user, "getRole");
+  });
+
+  afterEach(()=>{
+    jest.restoreAllMocks()
+  })
+
+  it("should return mocked guest role", () => {
+    roleSpy.mockReturnValue("guest");
+    const result = user.getRole(2);
+    expect(result).toBe("guest");
+  });
+  it("should return the original implementation", () => {
+    const result = user.getRole(2);
+    expect(result).toBe("admin");
+    expect(roleSpy).toHaveBeenCalledTimes(1) // confirm
+  });
+});
+
+//! ---------------------------------------------------------
+/*
+$ npm test -- example
+
+> 03-test-doubles@1.0.0 test
+> jest example
+
+ PASS  src/example.spec.ts
+  user role test
+    √ should return mocked guest role (4 ms)
+    √ should return the original implementation (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        0.802 s, estimated 1 s
+Ran all test suites matching example.
+
+*/
+//! ---------------------------------------------------------
+
+```
+
+
+

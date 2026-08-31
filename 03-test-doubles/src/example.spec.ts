@@ -18,37 +18,29 @@ const user = {
 
 // ------------------------------------- 🧪
 
-//! Spy using jest.spyOn()
-describe("spy mocking examples", () => {
-  it("uses mockReturnValue for sync functions", () => {
-    jest.spyOn(user, "getRole").mockReturnValue("guest");
-    const result = user.getRole(9);
-    // expect(result).toBe("admin"); ❌ FAILS!
+//! Clearing and resetting mocks in JEST
+describe("user role test", () => {
+  let roleSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    roleSpy = jest.spyOn(user, "getRole");
+  });
+
+  afterEach(()=>{
+    jest.restoreAllMocks()
+  })
+
+  it("should return mocked guest role", () => {
+    roleSpy.mockReturnValue("guest");
+    const result = user.getRole(2);
     expect(result).toBe("guest");
   });
-
-  // mock/spy async f(x) - jest.mockResolvedValue()
-  it("uses mockResolvedValue for async functions ", async () => {
-    const dummyUser = { id: 69, name: "Mocked User - Skyy" };
-    jest.spyOn(user, "fetchUserData").mockResolvedValue(dummyUser); // overriding
-
-    const result = await user.fetchUserData(34);
-    expect(result).toStrictEqual(dummyUser);
-  });
-
-  // complex logic - jest.mockImplementation()
-  // modify the behaviour - most powerful
-  it("uses mockImplementation for complex logic", () => {
-    jest.spyOn(user, "saveProfile").mockImplementation((name: string) => {
-      if (!name) {
-        throw new Error(`🔴Name is required!`);
-      }
-      return `saved-${name}`;
-    });
-    expect(() => user.saveProfile("")).toThrow("🔴Name is required!");
+  it("should return the original implementation", () => {
+    const result = user.getRole(2);
+    expect(result).toBe("admin");
+    expect(roleSpy).toHaveBeenCalledTimes(1) // confirm
   });
 });
-
 
 //! ---------------------------------------------------------
 /*
@@ -58,15 +50,15 @@ $ npm test -- example
 > jest example
 
  PASS  src/example.spec.ts
-  spy mocking examples
-    √ uses mockReturnValue for sync functions (3 ms)
-    √ uses mockResolvedValue for async functions  (2 ms)
-    √ uses mockImplementation for complex logic (24 ms)
+  user role test
+    √ should return mocked guest role (4 ms)
+    √ should return the original implementation (2 ms)
 
 Test Suites: 1 passed, 1 total
-Tests:       3 passed, 3 total
+Tests:       2 passed, 2 total
 Snapshots:   0 total
-Time:        0.732 s, estimated 1 s
+Time:        0.802 s, estimated 1 s
 Ran all test suites matching example.
+
 */
 //! ---------------------------------------------------------
