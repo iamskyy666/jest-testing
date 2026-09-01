@@ -118,7 +118,6 @@ $ npm test -- userService
 
   console.error
     Email is invalid!
-
       at UserService.registerUser (src/services/03-users/C:/Users/ASUS/Desktop/jest-testing/03-test-doubles/src/services/03-users/UserService.ts:15:15)
       at Object.<anonymous> (src/services/03-users/C:/Users/ASUS/Desktop/jest-testing/03-test-doubles/src/services/03-users/userService.spec.ts:94:20)
 
