@@ -38,6 +38,33 @@ describe("UserService", () => {
 
     expect(result).toEqual(successResponse);
   });
+
+  // Exploring testing strategies - Error handling 💡
+  // first sync-code errors
+  test("should throw an error-message if name is not provided", async () => {
+    const invalidInput = { name: "", email: mockEmail };
+    const userService = new UserService(invalidInput.name, invalidInput.email);
+    createUserSpy.mockImplementation(() => {
+      return Promise.reject("Name is required");
+    });
+
+    // expect(() => userService.registerUser()).toThrow(); // will fail because registerUser( ) is async
+
+    // For async() -
+    await expect(() => userService.registerUser()).rejects.toThrow();
+    await expect(() => userService.registerUser()).rejects.toThrow(
+      "User registration failed",
+    );
+
+    // Another approach try/catch
+    try {
+      await userService.registerUser();
+      fail("Should have thrown an error");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("User registration failed");
+    }
+  });
 });
 
 /*
@@ -48,11 +75,12 @@ $ npm test -- UserService
 
  PASS  src/services/01-users/UserService.spec.ts
   UserService
-    √ should successfully register user and return a success-message (6 ms)
+    √ should successfully register user and return a success-message (5 ms)
+    √ should throw an error-message if name is not provided (17 ms)
 
 Test Suites: 1 passed, 1 total
-Tests:       1 passed, 1 total
+Tests:       2 passed, 2 total
 Snapshots:   0 total
-Time:        1.152 s
+Time:        0.711 s, estimated 1 s
 Ran all test suites matching UserService.
 */
